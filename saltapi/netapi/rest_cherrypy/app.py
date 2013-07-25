@@ -980,6 +980,46 @@ class Events(object):
         return listen()
 
 
+import itertools
+
+class One(object):
+    exposed = True
+
+    _cp_config = dict(LowDataAdapter._cp_config, **{
+        'response.stream': True,
+        'tools.hypermedia_out.on': False,
+        'tools.encode.encoding': 'utf-8',
+        'tools.sessions.on': False,
+        'tools.salt_token.on': False,
+        'tools.salt_auth.on': False,
+    })
+
+    def GET(self):
+        cherrypy.response.headers['Content-Type'] = 'text/event-stream'
+        cherrypy.response.headers['Cache-Control'] = 'no-cache'
+        cherrypy.response.headers['Connection'] = 'keep-alive'
+
+        def count(counter):
+            while True:
+                yield u'{0}'.format(counter.next())
+
+        counter = itertools.count()
+        return count(counter)
+
+class Two(One):
+    def GET(self):
+        cherrypy.response.headers['Content-Type'] = 'text/event-stream'
+        cherrypy.response.headers['Cache-Control'] = 'no-cache'
+        cherrypy.response.headers['Connection'] = 'keep-alive'
+
+        def count(counter):
+            while True:
+                yield u'{0}'.format(counter.next())
+
+        counter = itertools.count()
+        return count(counter)
+
+
 class App(object):
     exposed = True
     def GET(self, *args):
@@ -999,6 +1039,8 @@ class API(object):
         'run': Run,
         'jobs': Jobs,
         'events': Events,
+        'one': One,
+        'two': Two,
     }
 
     def __init__(self):
