@@ -1096,6 +1096,9 @@ class API(object):
                 'server.socket_host': self.apiopts.get('host', '0.0.0.0'),
                 'server.socket_port': self.apiopts.get('port', 8000),
                 'debug': self.apiopts.get('debug', False),
+                'log.screen': False,
+                'log.access_file': '/tmp/cpy_access.log',
+                'log.error_file': '/tmp/cpy_error.log',
             },
             '/': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher(),
