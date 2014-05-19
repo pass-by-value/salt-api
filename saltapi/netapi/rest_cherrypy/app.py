@@ -1277,7 +1277,7 @@ class SynchronizingWebsocket(WebSocket):
         super(SynchronizingWebsocket, self).__init__(*args, **kwargs)
 
         '''
-        This pipe represents the parent end of the pipe.
+        This pipe needs to represent the parent end of a pipe.
         '''
         self.pipe = None
 
