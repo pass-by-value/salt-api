@@ -1230,7 +1230,6 @@ class Events(object):
         # Pulling the session token from an URL param is a workaround for
         # browsers not supporting CORS in the EventSource API.
         if token:
-            logger.info('There is token!!!!!!!!!!')
             orig_sesion, _ = cherrypy.session.cache.get(token, ({}, None))
             salt_token = orig_sesion.get('token')
         else:
@@ -1238,7 +1237,6 @@ class Events(object):
 
         # Manually verify the token
         if not salt_token or not self.auth.get_tok(salt_token):
-            logger.info('Redirecting')
             raise cherrypy.InternalRedirect('/login')
 
         # Release the session lock before starting the long-running response
@@ -1359,7 +1357,7 @@ class WebsocketEndpoint(object):
 
 
         '''
-        An handler is the server side end of the websocket connection.
+        A handler is the server side end of the websocket connection.
         Each request spawns a new instance of this handler
         '''
         handler = cherrypy.request.ws_handler
