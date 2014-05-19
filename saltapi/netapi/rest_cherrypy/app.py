@@ -215,8 +215,10 @@ import salt.utils.event
 import saltapi
 
 # Imports related to websocket
+import time
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
-from ws4py.websocket import EchoWebSocket
+from ws4py.websocket import WebSocket
+from multiprocessing import Process, Lock, Pipe
 
 logger = logging.getLogger(__name__)
 
@@ -1259,56 +1261,47 @@ class Events(object):
 
         return listen()
 
-import time
-from multiprocessing import Process, Lock
 
-class Foo(EchoWebSocket):
+class SynchronizingWebsocket(WebSocket):
     '''
     Class to handle requests sent to this websocket connection.
     Each instance of this class represents a Salt websocket connection.
-    Sets the ready state of this websocket.
-    Once the websocket is ready we can start sending data to the client.
+    Waits to receive a "ready" message fom the client.
+    Calls send on it's end of the pipe to signal to the sender.
     '''
     def __init__(self, *args, **kwargs):
         '''
-        Tracks the ``ready`` state of a websocket connection.
-        Ready state is tracked so that parallel senders
+        Waits for the client to be ready
         do not start sending events
         before the underlying websocket has had a chance to perform
         it's handshake.
         '''
-        logger.info('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^'*10)
-        self.is_ready = False
-        self.lock = Lock()
-        super(Foo, self).__init__(*args, **kwargs)
+        super(SynchronizingWebsocket, self).__init__(*args, **kwargs)
+
+        '''
+        This pipe represents the parent end of the pipe.
+        '''
+        self.pipe = None
 
     def received_message(self, message):
         '''
         Checks if the client has sent a ready message.
-        A ready message causes this handler to be marked ready
-        to send data to the client.
+        A ready message causes ``send()`` to be called on the
+        ``parent end`` of the pipe.
 
-        This ensures completion of initial websocket connection.
+        This ensures completion of the underlying websocket connection
+        and can be used to synchronize parallel senders.
         '''
-        with self.lock:
-            if message.data == 'websocket client ready':
-                logger.info('before***********************************************************')
-                self.is_ready
-                logger.info(str(self))
-                logger.info('before***********************************************************')
-                self.is_ready = True
-                logger.info('ready***********************************************************')
-                logger.info(self)
-                logger.info(self.is_ready)
-                logger.info('ready***********************************************************')
-            self.send(message.data, message.is_binary)
+        if message.data == 'websocket client ready':
+            self.pipe.send(message)
+        self.send(message.data, message.is_binary)
 
-class Websocket(object):
+class WebsocketEndpoint(object):
     '''
     The event bus on the Salt master exposes a large variety of things, notably
     when executions are started on the master and also when minions ultimately
     return their results. This URL provides a real-time window into a running
-    Salt infrastructure.
+    Salt infrastructure. Uses websocket as the transport mechanism.
     '''
     exposed = True
 
@@ -1323,7 +1316,7 @@ class Websocket(object):
         'tools.hypermedia_in.on': False,
         'tools.hypermedia_out.on': False,
         'tools.websocket.on': True,
-        'tools.websocket.handler_cls': Foo,
+        'tools.websocket.handler_cls': SynchronizingWebsocket,
     })
 
     def __init__(self):
@@ -1334,93 +1327,24 @@ class Websocket(object):
 
     def GET(self, token=None):
         '''
-        Return an HTTP stream of the Salt master event bus; this stream is
-        formatted per the Server Sent Events (SSE) spec
-
-        .. versionadded:: 0.8.3
-
-        Browser clients currently lack Cross-origin resource sharing (CORS)
-        support for the ``EventSource()`` API. Cross-domain requests from a
-        browser may instead pass the :mailheader:`X-Auth-Token` value as an URL
-        parameter::
-
-            % curl -NsS localhost:8000/events/6d1b722e
-
-        .. http:get:: /events
-
-            **Example request**::
-
-                % curl -NsS localhost:8000/events
-
-            .. code-block:: http
-
-                GET /events HTTP/1.1
-                Host: localhost:8000
-
-            **Example response**:
-
-            .. code-block:: http
-
-                HTTP/1.1 200 OK
-                Connection: keep-alive
-                Cache-Control: no-cache
-                Content-Type: text/event-stream;charset=utf-8
-
-                retry: 400
-                data: {'tag': '', 'data': {'minions': ['ms-4', 'ms-3', 'ms-2', 'ms-1', 'ms-0']}}
-
-                data: {'tag': '20130802115730568475', 'data': {'jid': '20130802115730568475', 'return': True, 'retcode': 0, 'success': True, 'cmd': '_return', 'fun': 'test.ping', 'id': 'ms-1'}}
+        Return a Websocket stream of the Salt master event bus
 
         The event stream can be easily consumed via JavaScript:
 
         .. code-block:: javascript
 
             # Note, you must be authenticated!
-            var source = new EventSource('/events');
-            source.onopen = function() { console.debug('opening') };
+            var source = new Websocket('ws://localhost:8000/websocket');
+            # The token can also be part of the URL as below
+            # var source = new Websocket('ws://localhost:8000/websocket/1c2d');
+            source.onopen = function() { source.send('websocket client ready') };
             source.onerror = function(e) { console.debug('error!', e) };
             source.onmessage = function(e) { console.debug(e.data) };
-
-        It is also possible to consume the stream via the shell.
-
-        Records are separated by blank lines; the ``data:`` and ``tag:``
-        prefixes will need to be removed manually before attempting to
-        unserialize the JSON.
-
-        curl's ``-N`` flag turns off input buffering which is required to
-        process the stream incrementally.
-
-        Here is a basic example of printing each event as it comes in:
-
-        .. code-block:: bash
-
-            % curl -NsS localhost:8000/events |\\
-                    while IFS= read -r line ; do
-                        echo $line
-                    done
-
-        Here is an example of using awk to filter events based on tag:
-
-        .. code-block:: bash
-
-            % curl -NsS localhost:8000/events |\\
-                    awk '
-                        BEGIN { RS=""; FS="\\n" }
-                        $1 ~ /^tag: salt\/job\/[0-9]+\/new$/ { print $0 }
-                    '
-            tag: salt/job/20140112010149808995/new
-            data: {"tag": "salt/job/20140112010149808995/new", "data": {"tgt_type": "glob", "jid": "20140112010149808995", "tgt": "jerry", "_stamp": "2014-01-12_01:01:49.809617", "user": "shouse", "arg": [], "fun": "test.ping", "minions": ["jerry"]}}
-            tag: 20140112010149808995
-            data: {"tag": "20140112010149808995", "data": {"fun_args": [], "jid": "20140112010149808995", "return": true, "retcode": 0, "success": true, "cmd": "_return", "_stamp": "2014-01-12_01:01:49.819316", "fun": "test.ping", "id": "jerry"}}
-
-        :status 200: success
-        :status 401: could not authenticate using provided credentials
         '''
+
         # Pulling the session token from an URL param is a workaround for
         # browsers not supporting CORS in the EventSource API.
-        logger.info('In the GET method for Websocket')
         if token:
-            logger.info('There is token!!!!!!!!!!!!!')
             orig_sesion, _ = cherrypy.session.cache.get(token, ({}, None))
             salt_token = orig_sesion.get('token')
         else:
@@ -1428,7 +1352,6 @@ class Websocket(object):
 
         # Manually verify the token
         if not salt_token or not self.auth.get_tok(salt_token):
-            logger.info('No token redirecting............')
             raise cherrypy.InternalRedirect('/login')
 
         # Release the session lock before starting the long-running response
@@ -1436,59 +1359,27 @@ class Websocket(object):
 
 
         '''
-        handler is the server side end of the websocket connection
-        a particular handler 
+        An handler is the server side end of the websocket connection.
+        Each request spawns a new instance of this handler
         '''
         handler = cherrypy.request.ws_handler
-        logger.info('adi`')
-        logger.info(handler)
-        logger.info('adi`')
-        def myfunction(handler):
+
+        def event_stream(handler, pipe):
+            pipe.recv()  # blocks until send is called on the parent end of this pipe.
             i = 0
             while True:
-                with handler.lock:
-                    logger.info('while before check')
-                    logger.info(handler.is_ready)
-                    if handler.is_ready:
-                        logger.info('Handler is ready!!!!!!!')
-                        i += 1
-                        msg = 'fpp {}'.format(i)
-                        from ws4py.messaging import TextMessage
-                        # msg = TextMessage('msg {}'.format(i))
-                        logger.info('msg is')
-                        logger.info(msg)
-                        # handler.send(msg, msg.is_binary)
-                        # Don't start sending before the underlying websocket is connected
-                        handler.send(str(msg), False)
-                    else:
-                        logger.info(handler)
-                        logger.info('Handler is not ready!!!!!!!')
+                logger.info('sending')
+                i += 1
+                msg = 'fpp {}'.format(i)
+                handler.send(str(msg), False)
                 time.sleep(5)
 
-        p = Process(target=myfunction, args=(handler,))
+        parent_pipe, child_pipe = Pipe()
+        handler.pipe = parent_pipe
+        # Process to handle async push to a client.
+        # Each GET request causes a process to be kicked off.
+        p = Process(target=event_stream, args=(handler,child_pipe))
         p.start()
-
-        # cherrypy.response.headers['Content-Type'] = 'text/event-stream'
-        # cherrypy.response.headers['Cache-Control'] = 'no-cache'
-        # cherrypy.response.headers['Connection'] = 'keep-alive'
-
-        # def listen():
-        #     # event = salt.utils.event.SaltEvent('master', self.opts['sock_dir'])
-        #     # stream = event.iter_events(full=True)
-
-        #     # yield u'retry: {0}\n'.format(400)
-
-        #     # while True:
-        #     #     data = stream.next()
-        #     #     yield u'tag: {0}\n'.format(data.get('tag', ''))
-        #     #     yield u'data: {0}\n\n'.format(json.dumps(data))
-        #     logger.info('In listen')
-        #     handler = cherrypy.request.ws_handler
-        #     # logger.info()
-        #     handler.send('adi is connected', False)
-        #     logger.info('In listen')
-
-        # return listen()
 
 
 class Webhook(object):
@@ -1689,7 +1580,7 @@ class API(object):
         'jobs': Jobs,
         'events': Events,
         'stats': Stats,
-        'websocket': Websocket,
+        'websocket': WebsocketEndpoint,
     }
 
     def __init__(self):
