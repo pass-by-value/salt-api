@@ -3,8 +3,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-jobs = {}
-
 
 class SaltInfo:
     '''
@@ -18,6 +16,17 @@ class SaltInfo:
         '''
         self.handler = handler
 
+        '''
+        These represent a "real time" view into Salt's jobs.
+        '''
+        self.jobs = {}
+
+        '''
+        This represents a "real time" view of minions connected to
+        Salt.
+        '''
+        self.minions = {}
+
     def publish(self, key, data):
         '''
         Publishes the data to the event stream.
@@ -25,19 +34,36 @@ class SaltInfo:
         publish_data = {key: data}
         self.handler.send(json.dumps(publish_data), False)
 
+    def process_minion_update(self, event_data):
+        '''
+        Associate grains data with a minion and publish minion update
+        '''
+        tag = event_data['tag']
+        event_info = event_data['data']
+
+        _, _, _, _, mid = tag.split('/')
+
+        if not self.minions.get(mid, None):
+            self.minions[mid] = {}
+
+        minion = self.minions[mid]
+
+        minion.update({'grains': event_info['return']})
+
+        self.publish('minions', self.minions)
+
     def process_ret_job_event(self, event_data):
         tag = event_data['tag']
         event_info = event_data['data']
 
         _, _, jid, _, mid = tag.split('/')
-
-        job = jobs[jid]
+        job = self.jobs[jid]
 
         minion = job['minions'][mid]
         minion.update({'return': event_info['return']})
         minion.update({'retcode': event_info['retcode']})
         minion.update({'success': event_info['success']})
-        self.publish('jobs', jobs)
+        self.publish('jobs', self.jobs)
 
     def process_new_job_event(self, event_data):
         '''
@@ -53,8 +79,6 @@ class SaltInfo:
         tag = event_data['tag']
         event_info = event_data['data']
         minions = {}
-        logger.info('event data is {}'.format(event_data))
-        logger.info('event info is {}'.format(event_info))
         for mid in event_info['minions']:
             minions[mid] = {}
 
@@ -67,16 +91,19 @@ class SaltInfo:
             'tgt_type': event_info['tgt_type'],
             'state': 'running',
         }
-        jobs[event_info['jid']] = job
-        self.publish('jobs', jobs)
+        self.jobs[event_info['jid']] = job
+        self.publish('jobs', self.jobs)
 
     def process(self, salt_data):
         '''
         Process events and publish data
         '''
         parts = salt_data['tag'].split('/')
+
         if parts[1] == 'job':
             if parts[3] == 'new':
                 self.process_new_job_event(salt_data)
             elif parts[3] == 'ret':
                 self.process_ret_job_event(salt_data)
+                if salt_data['data']['fun'] == 'grains.items':
+                    self.process_minion_update(salt_data)

@@ -1453,11 +1453,11 @@ class WebsocketEndpoint(object):
             pipe.recv()  # blocks until send is called on the parent end of this pipe.
 
             client = APIClient()
+            SaltInfo = event_processor.SaltInfo(handler)
             while True:
                 data =  client.get_event(wait=0.025, tag='salt/', full=True)
                 if data:
                     try: #work around try to decode catch unicode errors
-                        SaltInfo = event_processor.SaltInfo(handler)
                         SaltInfo.process(data)
                         # handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
                     except UnicodeDecodeError as ex:
