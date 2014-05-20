@@ -221,6 +221,7 @@ from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from multiprocessing import Process, Lock, Pipe
 from salt.client.api import APIClient
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -1422,19 +1423,15 @@ class WebsocketEndpoint(object):
         '''
         # Pulling the session token from an URL param is a workaround for
         # browsers not supporting CORS in the EventSource API.
+        if token:
+            orig_sesion, _ = cherrypy.session.cache.get(token, ({}, None))
+            salt_token = orig_sesion.get('token')
+        else:
+            salt_token = cherrypy.session.get('token')
 
-
-
-
-        # if token:
-        #     orig_sesion, _ = cherrypy.session.cache.get(token, ({}, None))
-        #     salt_token = orig_sesion.get('token')
-        # else:
-        #     salt_token = cherrypy.session.get('token')
-
-        # # Manually verify the token
-        # if not salt_token or not self.auth.get_tok(salt_token):
-        #     raise cherrypy.InternalRedirect('/login')
+        # Manually verify the token
+        if not salt_token or not self.auth.get_tok(salt_token):
+            raise cherrypy.InternalRedirect('/login')
 
         # Release the session lock before starting the long-running response
 
@@ -1448,12 +1445,23 @@ class WebsocketEndpoint(object):
         '''
         handler = cherrypy.request.ws_handler
 
-        # TBD: Make this yeild events like ``/events`` for Halite.
+
+        minions = {
+            'fun': 'grains.items',
+            'tgt': '*',
+            'expr_type': 'glob',
+            'mode': 'async',
+            'token': salt_token
+        }
+
         def event_stream(handler, pipe):
+            last_run = None
+            this_run = None
             pipe.recv()  # blocks until send is called on the parent end of this pipe.
 
             client = APIClient()
             SaltInfo = event_processor.SaltInfo(handler)
+            last_run = datetime.now()
             while True:
                 data =  client.get_event(wait=0.025, tag='salt/', full=True)
                 if data:
@@ -1463,6 +1471,13 @@ class WebsocketEndpoint(object):
                     except UnicodeDecodeError as ex:
                         logger.error("Error: Salt event has non UTF-8 data:\n{0}".format(data))
                 time.sleep(0.1)
+                this_run = datetime.now()
+
+                # Run grains every 10 seconds to check minion connectivity
+                if (this_run - last_run).total_seconds() > 10:
+                    client.run(minions)
+                    last_run = datetime.now()
+                    this_run = datetime.now()
 
         parent_pipe, child_pipe = Pipe()
         handler.pipe = parent_pipe

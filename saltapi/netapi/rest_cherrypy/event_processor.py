@@ -61,6 +61,7 @@ class SaltInfo:
         event_info = event_data['data']
 
         _, _, jid, _, mid = tag.split('/')
+        logger.info('jobs are {}'.format(self.jobs))
         job = self.jobs[jid]
 
         minion = job['minions'][mid]
@@ -114,6 +115,8 @@ class SaltInfo:
         if parts[1] == 'job':
             if parts[3] == 'new':
                 self.process_new_job_event(salt_data)
+                if salt_data['data']['fun'] == 'grains.items':
+                    self.minions = {}
             elif parts[3] == 'ret':
                 self.process_ret_job_event(salt_data)
                 if salt_data['data']['fun'] == 'grains.items':
