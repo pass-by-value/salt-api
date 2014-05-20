@@ -53,6 +53,10 @@ class SaltInfo:
         self.publish('minions', self.minions)
 
     def process_ret_job_event(self, event_data):
+        '''
+        Process a /ret event returned by Salt for a particular minion.
+        These events contain the returned results from a particular execution.
+        '''
         tag = event_data['tag']
         event_info = event_data['data']
 
@@ -63,6 +67,13 @@ class SaltInfo:
         minion.update({'return': event_info['return']})
         minion.update({'retcode': event_info['retcode']})
         minion.update({'success': event_info['success']})
+
+        job_complete = all([minion['success'] for mid, minion
+                            in job['minions'].iteritems()])
+
+        if job_complete:
+            job['state'] = 'complete'
+
         self.publish('jobs', self.jobs)
 
     def process_new_job_event(self, event_data):
@@ -80,7 +91,7 @@ class SaltInfo:
         event_info = event_data['data']
         minions = {}
         for mid in event_info['minions']:
-            minions[mid] = {}
+            minions[mid] = {'success': False}
 
         job = {
             'jid': event_info['jid'],
