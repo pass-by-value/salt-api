@@ -1448,7 +1448,6 @@ class WebsocketEndpoint(object):
             client = APIClient()
             while True:
                 data =  client.get_event(wait=0.025, tag='salt/', full=True)
-                logger.info('data is {}'.format(data))
                 if data:
                     try: #work around try to decode catch unicode errors
                         handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
