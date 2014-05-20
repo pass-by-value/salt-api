@@ -216,6 +216,7 @@ import saltapi
 
 # Imports related to websocket
 import time
+import event_processor
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from multiprocessing import Process, Lock, Pipe
@@ -1421,17 +1422,23 @@ class WebsocketEndpoint(object):
         '''
         # Pulling the session token from an URL param is a workaround for
         # browsers not supporting CORS in the EventSource API.
-        if token:
-            orig_sesion, _ = cherrypy.session.cache.get(token, ({}, None))
-            salt_token = orig_sesion.get('token')
-        else:
-            salt_token = cherrypy.session.get('token')
 
-        # Manually verify the token
-        if not salt_token or not self.auth.get_tok(salt_token):
-            raise cherrypy.InternalRedirect('/login')
+
+
+
+        # if token:
+        #     orig_sesion, _ = cherrypy.session.cache.get(token, ({}, None))
+        #     salt_token = orig_sesion.get('token')
+        # else:
+        #     salt_token = cherrypy.session.get('token')
+
+        # # Manually verify the token
+        # if not salt_token or not self.auth.get_tok(salt_token):
+        #     raise cherrypy.InternalRedirect('/login')
 
         # Release the session lock before starting the long-running response
+
+
         cherrypy.session.release_lock()
 
 
@@ -1450,7 +1457,9 @@ class WebsocketEndpoint(object):
                 data =  client.get_event(wait=0.025, tag='salt/', full=True)
                 if data:
                     try: #work around try to decode catch unicode errors
-                        handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
+                        SaltInfo = event_processor.SaltInfo(handler)
+                        SaltInfo.process(data)
+                        # handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
                     except UnicodeDecodeError as ex:
                         logger.error("Error: Salt event has non UTF-8 data:\n{0}".format(data))
                 time.sleep(0.1)
@@ -1459,8 +1468,8 @@ class WebsocketEndpoint(object):
         handler.pipe = parent_pipe
         # Process to handle async push to a client.
         # Each GET request causes a process to be kicked off.
-        p = Process(target=event_stream, args=(handler,child_pipe))
-        p.start()
+        proc = Process(target=event_stream, args=(handler,child_pipe))
+        proc.start()
 
 
 class Webhook(object):
