@@ -219,6 +219,7 @@ import time
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from multiprocessing import Process, Lock, Pipe
+from salt.client.api import APIClient
 
 logger = logging.getLogger(__name__)
 
@@ -1443,13 +1444,17 @@ class WebsocketEndpoint(object):
         # TBD: Make this yeild events like ``/events`` for Halite.
         def event_stream(handler, pipe):
             pipe.recv()  # blocks until send is called on the parent end of this pipe.
-            i = 0
+
+            client = APIClient()
             while True:
-                logger.info('sending')
-                i += 1
-                msg = 'fpp {}'.format(i)
-                handler.send(str(msg), False)
-                time.sleep(5)
+                data =  client.get_event(wait=0.025, tag='salt/', full=True)
+                logger.info('data is {}'.format(data))
+                if data:
+                    try: #work around try to decode catch unicode errors
+                        handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
+                    except UnicodeDecodeError as ex:
+                        logger.error("Error: Salt event has non UTF-8 data:\n{0}".format(data))
+                time.sleep(0.1)
 
         parent_pipe, child_pipe = Pipe()
         handler.pipe = parent_pipe
