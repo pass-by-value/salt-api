@@ -27,6 +27,21 @@ class SaltInfo:
         '''
         self.minions = {}
 
+    def publish_minions(self):
+        '''
+        Publishes minions as a list of dicts.
+        '''
+        minions = []
+
+        for minion, minion_info in self.minions.iteritems():
+            curr_minion = {}
+            curr_minion.update(minion_info)
+            curr_minion.update({'id': minion})
+            minions.append(curr_minion)
+
+        ret = {'minions': minions}
+        self.handler.send(json.dumps(ret), False)
+
     def publish(self, key, data):
         '''
         Publishes the data to the event stream.
@@ -50,7 +65,7 @@ class SaltInfo:
 
         minion.update({'grains': event_info['return']})
 
-        self.publish('minions', self.minions)
+        self.publish_minions()
 
     def process_ret_job_event(self, event_data):
         '''
@@ -96,7 +111,7 @@ class SaltInfo:
         job = {
             'jid': event_info['jid'],
             'start_time': event_info['_stamp'],
-            'minions': minions,  # is a dictionary keyed my mids
+            'minions': minions,  # is a dictionary keyed by mids
             'fun': event_info['fun'],
             'tgt': event_info['tgt'],
             'tgt_type': event_info['tgt_type'],
@@ -123,7 +138,7 @@ class SaltInfo:
         elif event_info['act'] == 'accept':
             self.minions.setdefault(event_info['id'], {})
 
-        self.publish('minions', self.minions)
+        self.publish_minions()
 
     def process(self, salt_data):
         '''
