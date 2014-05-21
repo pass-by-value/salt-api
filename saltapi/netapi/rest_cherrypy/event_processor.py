@@ -61,9 +61,9 @@ class SaltInfo:
         event_info = event_data['data']
 
         _, _, jid, _, mid = tag.split('/')
-        job = self.jobs[jid]
+        job = self.jobs.setdefault(jid, {})
 
-        minion = job['minions'][mid]
+        minion = job.setdefault('minions', {}).setdefault(mid, {})
         minion.update({'return': event_info['return']})
         minion.update({'retcode': event_info['retcode']})
         minion.update({'success': event_info['success']})

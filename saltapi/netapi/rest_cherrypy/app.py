@@ -1270,6 +1270,10 @@ class SynchronizingWebsocket(WebSocket):
     Waits to receive a ``ready`` message fom the client.
     Calls send on it's end of the pipe to signal to the sender on receipt
     of ``ready``.
+
+    This class also kicks off initial information probing jobs when clients
+    initially connect. These jobs help gather information about minions, jobs,
+    and documentation.
     '''
     def __init__(self, *args, **kwargs):
         super(SynchronizingWebsocket, self).__init__(*args, **kwargs)
@@ -1281,6 +1285,13 @@ class SynchronizingWebsocket(WebSocket):
         [pipe](https://docs.python.org/2/library/multiprocessing.html#exchanging-objects-between-processes).
         '''
         self.pipe = None
+
+        '''
+        The token that we can use to make API calls.
+        There are times when we would like to kick off jobs,
+        examples include trying to obtain minions connected.
+        '''
+        self.token = None
 
     def received_message(self, message):
         '''
@@ -1297,6 +1308,13 @@ class SynchronizingWebsocket(WebSocket):
         '''
         if message.data == 'websocket client ready':
             self.pipe.send(message)
+            client = APIClient()
+            client.run({
+                'fun': 'grains.items',
+                'tgt': '*',
+                'token': self.token,
+                'mode': 'async'
+                })
         self.send(message.data, message.is_binary)
 
 
