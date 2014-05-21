@@ -61,7 +61,6 @@ class SaltInfo:
         event_info = event_data['data']
 
         _, _, jid, _, mid = tag.split('/')
-        logger.info('jobs are {}'.format(self.jobs))
         job = self.jobs[jid]
 
         minion = job['minions'][mid]
@@ -106,6 +105,26 @@ class SaltInfo:
         self.jobs[event_info['jid']] = job
         self.publish('jobs', self.jobs)
 
+    def process_key_event(self, event_data):
+        tag = event_data['tag']
+        event_info = event_data['data']
+
+        '''
+        Tag: salt/key
+        Data:
+        {'_stamp': '2014-05-20T22:45:04.345583',
+         'act': 'delete',
+         'id': 'compute.home',
+         'result': True}
+        '''
+
+        if event_info['act'] == 'delete':
+            self.minions.pop(event_info['id'], None)
+        elif event_info['act'] == 'accept':
+            self.minions.setdefault(event_info['id'], {})
+
+        self.publish('minions', self.minions)
+
     def process(self, salt_data):
         '''
         Process events and publish data
@@ -121,3 +140,5 @@ class SaltInfo:
                 self.process_ret_job_event(salt_data)
                 if salt_data['data']['fun'] == 'grains.items':
                     self.process_minion_update(salt_data)
+        if parts[1] == 'key':
+            self.process_key_event(salt_data)
