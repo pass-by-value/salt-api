@@ -1,6 +1,8 @@
 import json
 import logging
 
+from salt.client.api import APIClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -140,7 +142,35 @@ class SaltInfo:
 
         self.publish_minions()
 
-    def process(self, salt_data):
+    def process_presense_events(salt_data):
+        tag = event_data['tag']
+        event_info = event_data['data']
+
+        minions_detected = event_info['present']
+        curr_minions = self.minions.keys()
+
+        # check if any connections were dropped
+        dropped_minions = set(curr_minions) - set(minions_detected)
+
+        for minion in dropped_minions:
+            self.minions.pop(minion, None)
+
+        # check if any new connections were made
+        new_minions = set(minions_detected) - set(curr_minions)
+
+        tgt = new_minions.join(',')
+
+        if tgt:
+            client = APIClient()
+            client.run(
+                {
+                    'fun': 'grains.items',
+                    'tgt': tgt,
+                    'expr_type': 'list',
+                    'mode': 'async'
+                })
+
+    def process(self, salt_data, token):
         '''
         Process events and publish data
         '''

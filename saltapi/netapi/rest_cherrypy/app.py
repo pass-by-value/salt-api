@@ -1474,29 +1474,19 @@ class WebsocketEndpoint(object):
         }
 
         def event_stream(handler, pipe):
-            last_run = None
-            this_run = None
             pipe.recv()  # blocks until send is called on the parent end of this pipe.
 
             client = APIClient()
             SaltInfo = event_processor.SaltInfo(handler)
-            last_run = datetime.now()
             while True:
                 data =  client.get_event(wait=0.025, tag='salt/', full=True)
                 if data:
                     try: #work around try to decode catch unicode errors
-                        SaltInfo.process(data)
+                        SaltInfo.process(data, salt_token)
                         # handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
                     except UnicodeDecodeError as ex:
                         logger.error("Error: Salt event has non UTF-8 data:\n{0}".format(data))
                 time.sleep(0.1)
-                this_run = datetime.now()
-
-                # Run grains every 10 seconds to check minion connectivity
-                # if (this_run - last_run).total_seconds() > 10:
-                #     client.run(minions)
-                #     last_run = datetime.now()
-                #     this_run = datetime.now()
 
         parent_pipe, child_pipe = Pipe()
         handler.pipe = parent_pipe
@@ -1702,8 +1692,6 @@ class AllEvents(object):
         handler = cherrypy.request.ws_handler
 
         def event_stream(handler, pipe):
-            last_run = None
-            this_run = None
             pipe.recv()  # blocks until send is called on the parent end of this pipe.
             client = APIClient()
             while True:
