@@ -157,3 +157,5 @@ class SaltInfo:
                     self.process_minion_update(salt_data)
         if parts[1] == 'key':
             self.process_key_event(salt_data)
+        if parts[1] == 'presense':
+            logger.info('Presence {}'.format(salt_data))
