@@ -165,7 +165,7 @@ class SaltInfo:
         # check if any new connections were made
         new_minions = set(minions_detected) - set(curr_minions)
 
-        tgt = new_minions.join(',')
+        tgt = ','.join(new_minions)
 
         if tgt:
             changed = True
