@@ -143,16 +143,23 @@ class SaltInfo:
         self.publish_minions()
 
     def process_presense_events(salt_data):
+        '''
+        Check if any minions have connected or dropped.
+        Send a message to the client if they have.
+        '''
         tag = event_data['tag']
         event_info = event_data['data']
 
         minions_detected = event_info['present']
         curr_minions = self.minions.keys()
 
+        changed = False
+
         # check if any connections were dropped
         dropped_minions = set(curr_minions) - set(minions_detected)
 
         for minion in dropped_minions:
+            changed = True
             self.minions.pop(minion, None)
 
         # check if any new connections were made
@@ -161,6 +168,7 @@ class SaltInfo:
         tgt = new_minions.join(',')
 
         if tgt:
+            changed = True
             client = APIClient()
             client.run(
                 {
@@ -169,6 +177,9 @@ class SaltInfo:
                     'expr_type': 'list',
                     'mode': 'async'
                 })
+
+        if changed:
+            self.publish_minions()
 
     def process(self, salt_data, token):
         '''

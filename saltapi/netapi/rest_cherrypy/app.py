@@ -1370,7 +1370,13 @@ class WebsocketEndpoint(object):
     def GET(self, token=None):
         '''
         Return a websocket connection to Salt
-        representing Salt's "real time" event stream.
+        representing Salt's formatted "real time" event stream.
+
+        Makes use of Salt's
+        [presense](http://docs.saltstack.com/en/latest/topics/event/master_events.html#presence-events)
+        events to track minions connected. Presense events are tyrned OFF by default
+        can be turned on using the ``presense_events`` and ``loop_interval`` options
+        in the Salt master [config file](http://docs.saltstack.com/en/latest/ref/configuration/master.html).
 
         Provides a convenient way for clients to make an HTTP
         call and obtain a websocket connection.
