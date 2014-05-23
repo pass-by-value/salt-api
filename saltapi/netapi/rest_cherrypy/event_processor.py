@@ -1,8 +1,6 @@
 import json
 import logging
 
-from salt.client.api import APIClient
-
 logger = logging.getLogger(__name__)
 
 
@@ -142,7 +140,7 @@ class SaltInfo:
 
         self.publish_minions()
 
-    def process_presense_events(salt_data):
+    def process_presense_events(salt_data, token, opts):
         '''
         Check if any minions have connected or dropped.
         Send a message to the client if they have.
@@ -169,23 +167,28 @@ class SaltInfo:
 
         if tgt:
             changed = True
-            client = APIClient()
+            client = saltapi.APIClient(opts)
             client.run(
                 {
                     'fun': 'grains.items',
                     'tgt': tgt,
                     'expr_type': 'list',
-                    'mode': 'async'
+                    'mode': 'client',
+                    'client': 'local',
+                    'async': 'local_async',
+                    'token': token,
                 })
 
         if changed:
             self.publish_minions()
 
-    def process(self, salt_data, token):
+    def process(self, salt_data, token, opts):
         '''
         Process events and publish data
         '''
         parts = salt_data['tag'].split('/')
+        if len(parts) < 2:
+            return
 
         if parts[1] == 'job':
             if parts[3] == 'new':

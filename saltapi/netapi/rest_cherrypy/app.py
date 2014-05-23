@@ -220,7 +220,6 @@ import event_processor
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from multiprocessing import Process, Lock, Pipe
-from salt.client.api import APIClient
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -1293,6 +1292,11 @@ class SynchronizingWebsocket(WebSocket):
         '''
         self.token = None
 
+        '''
+        Options represent ``salt`` options defined in the configs.
+        '''
+        self.opts = None
+
     def received_message(self, message):
         '''
         Checks if the client has sent a ready message.
@@ -1308,13 +1312,14 @@ class SynchronizingWebsocket(WebSocket):
         '''
         if message.data == 'websocket client ready':
             self.pipe.send(message)
-            client = APIClient()  # use the one from salt-api
+            client = saltapi.APIClient(self.opts)
             client.run({
                 'fun': 'grains.items',
                 'tgt': '*',
                 'token': self.token,
                 'mode': 'client',
-                'async': 'local_async'
+                'async': 'local_async',
+                'client': 'local'
                 })
         self.send(message.data, message.is_binary)
 
@@ -1481,13 +1486,15 @@ class WebsocketEndpoint(object):
         def event_stream(handler, pipe):
             pipe.recv()  # blocks until send is called on the parent end of this pipe.
 
-            client = APIClient()
+            event = salt.utils.event.SaltEvent('master', self.opts['sock_dir'])
+            stream = event.iter_events(full=True)
             SaltInfo = event_processor.SaltInfo(handler)
             while True:
-                data =  client.get_event(wait=0.025, tag='salt/', full=True)
+                # data =  client.get_event(wait=0.025, tag='salt/', full=True)
+                data = stream.next()
                 if data:
                     try: #work around try to decode catch unicode errors
-                        SaltInfo.process(data, salt_token)
+                        SaltInfo.process(data, salt_token, self.opts)
                         # handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
                     except UnicodeDecodeError as ex:
                         logger.error("Error: Salt event has non UTF-8 data:\n{0}".format(data))
@@ -1495,6 +1502,7 @@ class WebsocketEndpoint(object):
 
         parent_pipe, child_pipe = Pipe()
         handler.pipe = parent_pipe
+        handler.opts = self.opts
         # Process to handle async push to a client.
         # Each GET request causes a process to be kicked off.
         proc = Process(target=event_stream, args=(handler,child_pipe))
