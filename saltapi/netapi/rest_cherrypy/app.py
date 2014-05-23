@@ -1696,9 +1696,12 @@ class AllEvents(object):
 
         def event_stream(handler, pipe):
             pipe.recv()  # blocks until send is called on the parent end of this pipe.
-            client = APIClient()
+
+            event = salt.utils.event.SaltEvent('master', self.opts['sock_dir'])
+            stream = event.iter_events(full=True)
+
             while True:
-                data =  client.get_event(wait=0.025, tag='salt/', full=True)
+                data = stream.next()
                 if data:
                     try: #work around try to decode catch unicode errors
                         handler.send('data: {0}\n\n'.format(json.dumps(data)), False)
