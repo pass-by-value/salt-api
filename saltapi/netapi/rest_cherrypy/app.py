@@ -1308,12 +1308,13 @@ class SynchronizingWebsocket(WebSocket):
         '''
         if message.data == 'websocket client ready':
             self.pipe.send(message)
-            client = APIClient()
+            client = APIClient()  # use the one from salt-api
             client.run({
                 'fun': 'grains.items',
                 'tgt': '*',
                 'token': self.token,
-                'mode': 'async'
+                'mode': 'client',
+                'async': 'local_async'
                 })
         self.send(message.data, message.is_binary)
 
@@ -1454,7 +1455,7 @@ class WebsocketEndpoint(object):
 
         # Manually verify the token
         if not salt_token or not self.auth.get_tok(salt_token):
-            raise cherrypy.InternalRedirect('/login')
+            raise cherrypy.HTTPError(401)  # unauthorized
 
         # Release the session lock before starting the long-running response
 
@@ -1679,7 +1680,7 @@ class AllEvents(object):
 
         # Manually verify the token
         if not salt_token or not self.auth.get_tok(salt_token):
-            raise cherrypy.InternalRedirect('/login')
+            raise cherrypy.HTTPError(401)  # unauthorized
 
         # Release the session lock before starting the long-running response
 
