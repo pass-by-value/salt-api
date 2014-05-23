@@ -1364,8 +1364,6 @@ class WebsocketEndpoint(object):
     def __init__(self):
         self.opts = cherrypy.config['saltopts']
         self.auth = salt.auth.LoadAuth(self.opts)
-        WebSocketPlugin(cherrypy.engine).subscribe()
-        cherrypy.tools.websocket = WebSocketTool()
 
     def GET(self, token=None):
         '''
@@ -1597,8 +1595,6 @@ class AllEvents(object):
     def __init__(self):
         self.opts = cherrypy.config['saltopts']
         self.auth = salt.auth.LoadAuth(self.opts)
-        WebSocketPlugin(cherrypy.engine).subscribe()
-        cherrypy.tools.websocket = WebSocketTool()
 
     def GET(self, token=None):
         '''
@@ -1932,6 +1928,9 @@ class API(object):
 
         if 'app' in self.apiopts:
             setattr(self, self.apiopts.get('app_path', 'app').lstrip('/'), App())
+
+        cherrypy.tools.websocket = WebSocketTool()
+        WebSocketPlugin(cherrypy.engine).subscribe()
 
     def get_conf(self):
         '''
