@@ -1321,7 +1321,7 @@ class SynchronizingWebsocket(WebSocket):
                 'async': 'local_async',
                 'client': 'local'
                 })
-        self.send(message.data, message.is_binary)
+        self.send('server received message', False)
 
 
 class WebsocketEndpoint(object):
@@ -1555,7 +1555,7 @@ class SynchronizingHandler(WebSocket):
         '''
         if message.data == 'websocket client ready':
             self.pipe.send(message)
-        self.send(message.data, message.is_binary)
+        self.send('server received message', False)
 
 
 class AllEvents(object):
