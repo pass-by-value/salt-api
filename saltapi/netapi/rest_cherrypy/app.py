@@ -220,7 +220,6 @@ import event_processor
 from ws4py.server.cherrypyserver import WebSocketPlugin, WebSocketTool
 from ws4py.websocket import WebSocket
 from multiprocessing import Process, Lock, Pipe
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -1716,7 +1715,6 @@ class AllEvents(object):
                     except UnicodeDecodeError as ex:
                         logger.error("Error: Salt event has non UTF-8 data:\n{0}".format(data))
                 time.sleep(0.1)
-                this_run = datetime.now()
 
         parent_pipe, child_pipe = Pipe()
         handler.pipe = parent_pipe
