@@ -5,6 +5,7 @@ A REST API for Salt
 .. py:currentmodule:: saltapi.netapi.rest_cherrypy.app
 
 :depends:   - CherryPy Python module
+:depends:   - ws4py Python module
 :configuration: All authentication is done through Salt's :ref:`external auth
     <acl-eauth>` system. Be sure that it is enabled and the user you are
     authenticating as has permissions for all the functions you will be
@@ -1280,7 +1281,7 @@ class SynchronizingWebsocket(WebSocket):
         This pipe needs to represent the parent end of a pipe.
         Clients need to ensure that the pipe assigned to ``self.pipe`` is
         the ``parent end`` of a
-        [pipe](https://docs.python.org/2/library/multiprocessing.html#exchanging-objects-between-processes).
+        `pipe <https://docs.python.org/2/library/multiprocessing.html#exchanging-objects-between-processes>`_.
         '''
         self.pipe = None
 
@@ -1303,8 +1304,7 @@ class SynchronizingWebsocket(WebSocket):
         ``parent end`` of the pipe.
 
         Clients need to ensure that the pipe assigned to ``self.pipe`` is
-        the ``parent end`` of a
-        [pipe](https://docs.python.org/2/library/multiprocessing.html#exchanging-objects-between-processes).
+        the ``parent end`` of a pipe.
 
         This ensures completion of the underlying websocket connection
         and can be used to synchronize parallel senders.
@@ -1335,19 +1335,30 @@ class WebsocketEndpoint(object):
     All requests should include an auth token.
     A way to obtain obtain authentication tokens is shown below.
 
-    ..code-block:: bash
-        curl -si localhost:8000/login \
-        -H "Accept: application/json" \
-        -d username='salt' \
-        -d password='salt' \
-        -d eauth='pam'
+    .. code-block:: bash
+
+        % curl -si localhost:8000/login \\
+            -H "Accept: application/json" \\
+            -d username='salt' \\
+            -d password='salt' \\
+            -d eauth='pam'
 
     Which results in the response
 
-    ..code-block:: json
-        {"return": [{"perms": [".*", "@runner", "@wheel"], "start": 1400556492.277421, "token": "d0ce6c1a37e99dcc0374392f272fe19c0090cca7", "expire": 1400599692.277422, "user": "salt", "eauth": "pam"}]}
+    .. code-block:: json
 
-    In this example the ``token`` returned is d0ce6c1a37e99dcc0374392f272fe19c0090cca7 and can be included
+        {
+            "return": [{
+                "perms": [".*", "@runner", "@wheel"],
+                "start": 1400556492.277421,
+                "token": "d0ce6c1a37e99dcc0374392f272fe19c0090cca7",
+                "expire": 1400599692.277422,
+                "user": "salt",
+                "eauth": "pam"
+            }]
+        }
+
+    In this example the ``token`` returned is ``d0ce6c1a37e99dcc0374392f272fe19c0090cca7`` and can be included
     in subsequent websocket requests (perhaps as part of the URL).
     '''
     exposed = True
@@ -1375,33 +1386,37 @@ class WebsocketEndpoint(object):
         Return a websocket connection to Salt
         representing Salt's formatted "real time" event stream.
 
-        Makes use of Salt's
-        [presense](http://docs.saltstack.com/en/latest/topics/event/master_events.html#presence-events)
-        events to track minions connected. Presense events are tyrned OFF by default
-        can be turned on using the ``presense_events`` and ``loop_interval`` options
-        in the Salt master [config file](http://docs.saltstack.com/en/latest/ref/configuration/master.html).
+        Makes use of Salt's ``presence
+        events`` to track minions connected. Presence events are OFF by default and
+        can be turned on using the ``presence_events`` and ``loop_interval`` options
+        in the Salt master :ref:`config file <configuration-salt-master>`.
 
         Provides a convenient way for clients to make an HTTP
         call and obtain a websocket connection.
 
-        **Example response**:
-        .. code-block:: http
+        .. http:get:: /formatted_events
 
-            Request URL:ws://localhost:8000/formatted_events/d0ce6c1a37e99dcc0374392f272fe19c0090cca7
-            Request Method:GET
-            Status Code:101 Switching Protocols
-            Host:localhost:8000
-            Origin:http://localhost:8000
-            Pragma:no-cache
-            Sec-WebSocket-Extensions:permessage-deflate; client_max_window_bits, x-webkit-deflate-frame
-            Sec-WebSocket-Key:Bdp7VlCtPvkieC3epOiIgA==
-            Sec-WebSocket-Version:13
-            Upgrade:websocket
-            Connection:Upgrade
-            Content-Type:text/plain;charset=utf-8
-            Date:Tue, 20 May 2014 02:03:08 GMT
-            Server:CherryPy/3.2.3
-            Upgrade:websocket
+            **Example response**:
+
+            .. code-block:: http
+
+                Request URL:ws://localhost:8000/formatted_events/d0ce6c1a37e99dcc0374392f272fe19c0090cca7
+                Request Method:GET
+                Status Code:101 Switching Protocols
+                Host:localhost:8000
+                Origin:http://localhost:8000
+                Pragma:no-cache
+                Sec-WebSocket-Extensions:permessage-deflate; client_max_window_bits, x-webkit-deflate-frame
+                Sec-WebSocket-Key:Bdp7VlCtPvkieC3epOiIgA==
+                Sec-WebSocket-Version:13
+                Upgrade:websocket
+                Connection:Upgrade
+                Content-Type:text/plain;charset=utf-8
+                Date:Tue, 20 May 2014 02:03:08 GMT
+                Server:CherryPy/3.2.3
+                Upgrade:websocket
+
+        :status 401: could not authenticate using provided credentials
 
         The event stream can be easily consumed via JavaScript:
 
@@ -1424,9 +1439,11 @@ class WebsocketEndpoint(object):
             // Terminates websocket connection and Salt's "real time" event stream on the server.
             source.close();
 
-        Or via Python, using [websocket-client](https://pypi.python.org/pypi/websocket-client/) for example.
+        Or via Python, using the Python module
+        `websocket-client <https://pypi.python.org/pypi/websocket-client/>`_ for example.
 
         .. code-block:: python
+
             # Note, you must be authenticated!
 
             from websocket import create_connection
@@ -1528,7 +1545,7 @@ class SynchronizingHandler(WebSocket):
         This pipe needs to represent the parent end of a pipe.
         Clients need to ensure that the pipe assigned to ``self.pipe`` is
         the ``parent end`` of a
-        [pipe](https://docs.python.org/2/library/multiprocessing.html#exchanging-objects-between-processes).
+        `pipe <https://docs.python.org/2/library/multiprocessing.html#exchanging-objects-between-processes>`_.
         '''
         self.pipe = None
 
@@ -1546,8 +1563,7 @@ class SynchronizingHandler(WebSocket):
         ``parent end`` of the pipe.
 
         Clients need to ensure that the pipe assigned to ``self.pipe`` is
-        the ``parent end`` of a
-        [pipe](https://docs.python.org/2/library/multiprocessing.html#exchanging-objects-between-processes).
+        the ``parent end`` of a pipe.
 
         This ensures completion of the underlying websocket connection
         and can be used to synchronize parallel senders.
@@ -1569,19 +1585,30 @@ class AllEvents(object):
     All requests should include an auth token.
     A way to obtain obtain authentication tokens is shown below.
 
-    ..code-block:: bash
-        curl -si localhost:8000/login \
-        -H "Accept: application/json" \
-        -d username='salt' \
-        -d password='salt' \
-        -d eauth='pam'
+    .. code-block:: bash
+
+        % curl -si localhost:8000/login \\
+            -H "Accept: application/json" \\
+            -d username='salt' \\
+            -d password='salt' \\
+            -d eauth='pam'
 
     Which results in the response
 
-    ..code-block:: json
-        {"return": [{"perms": [".*", "@runner", "@wheel"], "start": 1400556492.277421, "token": "d0ce6c1a37e99dcc0374392f272fe19c0090cca7", "expire": 1400599692.277422, "user": "salt", "eauth": "pam"}]}
+    .. code-block:: json
 
-    In this example the ``token`` returned is d0ce6c1a37e99dcc0374392f272fe19c0090cca7 and can be included
+        {
+            "return": [{
+                "perms": [".*", "@runner", "@wheel"],
+                "start": 1400556492.277421,
+                "token": "d0ce6c1a37e99dcc0374392f272fe19c0090cca7",
+                "expire": 1400599692.277422,
+                "user": "salt",
+                "eauth": "pam"
+            }]
+        }
+
+    In this example the ``token`` returned is ``d0ce6c1a37e99dcc0374392f272fe19c0090cca7`` and can be included
     in subsequent websocket requests (perhaps as part of the URL).
     '''
     exposed = True
@@ -1612,24 +1639,29 @@ class AllEvents(object):
         Provides a convenient way for clients to make an HTTP
         call and obtain a websocket connection.
 
-        **Example response**:
-        .. code-block:: http
+        .. http:get:: /all_events
 
-            Request URL:ws://localhost:8000/all_events/d0ce6c1a37e99dcc0374392f272fe19c0090cca7
-            Request Method:GET
-            Status Code:101 Switching Protocols
-            Host:localhost:8000
-            Origin:http://localhost:8000
-            Pragma:no-cache
-            Sec-WebSocket-Extensions:permessage-deflate; client_max_window_bits, x-webkit-deflate-frame
-            Sec-WebSocket-Key:Bdp7VlCtPvkieC3epOiIgA==
-            Sec-WebSocket-Version:13
-            Upgrade:websocket
-            Connection:Upgrade
-            Content-Type:text/plain;charset=utf-8
-            Date:Tue, 20 May 2014 02:03:08 GMT
-            Server:CherryPy/3.2.3
-            Upgrade:websocket
+            **Example response**:
+
+            .. code-block:: http
+
+                Request URL:ws://localhost:8000/all_events/d0ce6c1a37e99dcc0374392f272fe19c0090cca7
+                Request Method:GET
+                Status Code:101 Switching Protocols
+                Host:localhost:8000
+                Origin:http://localhost:8000
+                Pragma:no-cache
+                Sec-WebSocket-Extensions:permessage-deflate; client_max_window_bits, x-webkit-deflate-frame
+                Sec-WebSocket-Key:Bdp7VlCtPvkieC3epOiIgA==
+                Sec-WebSocket-Version:13
+                Upgrade:websocket
+                Connection:Upgrade
+                Content-Type:text/plain;charset=utf-8
+                Date:Tue, 20 May 2014 02:03:08 GMT
+                Server:CherryPy/3.2.3
+                Upgrade:websocket
+
+        :status 401: could not authenticate using provided credentials
 
         The event stream can be easily consumed via JavaScript:
 
@@ -1652,9 +1684,11 @@ class AllEvents(object):
             // Terminates websocket connection and Salt's "real time" event stream on the server.
             source.close();
 
-        Or via Python, using [websocket-client](https://pypi.python.org/pypi/websocket-client/) for example.
+        Or via Python, using the Python module
+        `websocket-client <https://pypi.python.org/pypi/websocket-client/>`_ for example.
 
         .. code-block:: python
+
             # Note, you must be authenticated!
 
             from websocket import create_connection
