@@ -190,6 +190,7 @@ class SaltInfo:
         if len(parts) < 2:
             return
 
+        # TBD: Simplify these conditional expressions
         if parts[1] == 'job':
             if parts[3] == 'new':
                 self.process_new_job_event(salt_data)
@@ -202,4 +203,4 @@ class SaltInfo:
         if parts[1] == 'key':
             self.process_key_event(salt_data)
         if parts[1] == 'presense':
-            logger.info('Presence {}'.format(salt_data))
+            self.process_presense_events(salt_data, token, opts)
