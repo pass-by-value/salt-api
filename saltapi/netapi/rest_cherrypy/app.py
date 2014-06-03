@@ -1387,7 +1387,7 @@ class WebsocketEndpoint(object):
         **Example response**:
         .. code-block:: http
 
-            Request URL:ws://localhost:8000/websocket/d0ce6c1a37e99dcc0374392f272fe19c0090cca7
+            Request URL:ws://localhost:8000/formatted_events/d0ce6c1a37e99dcc0374392f272fe19c0090cca7
             Request Method:GET
             Status Code:101 Switching Protocols
             Host:localhost:8000
@@ -1410,7 +1410,7 @@ class WebsocketEndpoint(object):
             // Note, you must be authenticated!
 
             // Get the Websocket connection to Salt
-            var source = new Websocket('ws://localhost:8000/websocket/d0ce6c1a37e99dcc0374392f272fe19c0090cca7');
+            var source = new Websocket('ws://localhost:8000/formatted_events/d0ce6c1a37e99dcc0374392f272fe19c0090cca7');
 
             // Get Salt's "real time" event stream.
             source.onopen = function() { source.send('websocket client ready'); };
@@ -1432,7 +1432,7 @@ class WebsocketEndpoint(object):
             from websocket import create_connection
 
             # Get the Websocket connection to Salt
-            ws = create_connection('ws://localhost:8000/websocket/d0ce6c1a37e99dcc0374392f272fe19c0090cca7')
+            ws = create_connection('ws://localhost:8000/formatted_events/d0ce6c1a37e99dcc0374392f272fe19c0090cca7')
 
             # Get Salt's "real time" event stream.
             ws.send('websocket client ready')
@@ -1922,7 +1922,7 @@ class API(object):
         'jobs': Jobs,
         'events': Events,
         'stats': Stats,
-        'websocket': WebsocketEndpoint,
+        'formatted_events': WebsocketEndpoint,
         'all_events': AllEvents,
     }
 
